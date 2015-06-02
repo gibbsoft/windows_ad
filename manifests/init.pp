@@ -19,13 +19,13 @@ class windows_ad (
 
   ### Part Configure AD - Global
   $configure                 = 'present',
-  $domain                    = 'forest',
+  # not used? $domain                    = 'forest',
   $domainname                = undef,                # FQDN
   $netbiosdomainname         = undef,                # FQDN
   $configureflag             = true,                 # Flag to bypass the configuration of AD if desired
 
   #level AD
-  $domainlevel               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
+  level               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
   $forestlevel               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
 
   $installdns                = 'yes',                 # Add DNS Server Role
@@ -50,8 +50,8 @@ class windows_ad (
 
   ### Part Configure AD - Other
   $secure_string_pwd         = undef,
-  $installtype               = undef,          # New domain or replica of existing domain {replica | domain}
-  $domaintype                = undef,          # Type of domain {Tree | Child | Forest} (New domain tree in an existing forest, child domain, or new forest)
+  $installtype               = 'forest',          # New domain or replica of existing domain {replica | domain}
+  # not used? type                       = undef,          # Type of domain {Tree | Child | Forest} (New domain tree in an existing forest, child domain, or new forest)
   $sitename                  = undef,          # Site Name
 
   ### Define Hiera hashes
@@ -71,7 +71,7 @@ class windows_ad (
   validate_bool($configureflag)
   validate_bool($installflag)
 
-  class{'windows_ad::install':
+  class{'::windows_ad::install':
     ensure                 => $install,
     installmanagementtools => $installmanagementtools,
     installsubfeatures     => $installsubfeatures,
@@ -79,25 +79,35 @@ class windows_ad (
     installflag            => $installflag,
   }
 
-  class{'windows_ad::conf_forest':
-    ensure                    => $configure,
-    domainname                => $domainname,
-    netbiosdomainname         => $netbiosdomainname,
-    domainlevel               => $domainlevel,
-    forestlevel               => $forestlevel,
-    globalcatalog             => $globalcatalog,
-    databasepath              => $databasepath,
-    logpath                   => $logpath,
-    sysvolpath                => $sysvolpath,
-    dsrmpassword              => $dsrmpassword,
-    installdns                => $installdns,
-    kernel_ver                => $kernel_ver,
-    localadminpassword        => $localadminpassword,
-    force                     => $force,
-    forceremoval              => $forceremoval,
-    uninstalldnsrole          => $uninstalldnsrole,
-    demoteoperationmasterrole => $demoteoperationmasterrole,
-    configureflag             => $configureflag,
+  case $installtype {
+    'forest': {
+      class{'::windows_ad::conf_forest':
+        ensure                    => $configure,
+        domainname                => $domainname,
+        netbiosdomainname         => $netbiosdomainname,
+        domainlevel               => level,
+        forestlevel               => $forestlevel,
+        globalcatalog             => $globalcatalog,
+        databasepath              => $databasepath,
+        logpath                   => $logpath,
+        sysvolpath                => $sysvolpath,
+        dsrmpassword              => $dsrmpassword,
+        installdns                => $installdns,
+        kernel_ver                => $kernel_ver,
+        localadminpassword        => $localadminpassword,
+        force                     => $force,
+        forceremoval              => $forceremoval,
+        uninstalldnsrole          => $uninstalldnsrole,
+        demoteoperationmasterrole => $demoteoperationmasterrole,
+        configureflag             => $configureflag,
+      }
+    }
+    'child': {
+      notice 'create AD child'
+    }
+    default: {
+      fail 'Invlaid install type, try \'forest\' or \'child\''
+    }
   }
   if($installflag or $configureflag){
     if($install == 'present'){
