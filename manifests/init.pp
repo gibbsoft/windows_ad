@@ -25,7 +25,7 @@ class windows_ad (
   $configureflag             = true,                 # Flag to bypass the configuration of AD if desired
 
   #level AD
-  level               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
+  $domainlevel               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
   $forestlevel               = '6',                   # Domain level {4 - Server 2008 R2 | 5 - Server 2012 | 6 - Server 2012 R2}
 
   $installdns                = 'yes',                 # Add DNS Server Role
@@ -61,6 +61,9 @@ class windows_ad (
   $users_hiera_merge         = true,
   $usersingroup              = undef,
   $usersingroup_hiera_merge  = true,
+  $ent_admin_username        = undef,
+  $ent_admin_password        = undef,
+  $site_name                 = 'Default-First-Site-Name',
 ) {
   # when present install process will be set. if already install nothing done
   # when absent uninstall will be launch
@@ -79,36 +82,32 @@ class windows_ad (
     installflag            => $installflag,
   }
 
-  case $installtype {
-    'forest': {
-      class{'::windows_ad::conf_forest':
-        ensure                    => $configure,
-        domainname                => $domainname,
-        netbiosdomainname         => $netbiosdomainname,
-        domainlevel               => level,
-        forestlevel               => $forestlevel,
-        globalcatalog             => $globalcatalog,
-        databasepath              => $databasepath,
-        logpath                   => $logpath,
-        sysvolpath                => $sysvolpath,
-        dsrmpassword              => $dsrmpassword,
-        installdns                => $installdns,
-        kernel_ver                => $kernel_ver,
-        localadminpassword        => $localadminpassword,
-        force                     => $force,
-        forceremoval              => $forceremoval,
-        uninstalldnsrole          => $uninstalldnsrole,
-        demoteoperationmasterrole => $demoteoperationmasterrole,
-        configureflag             => $configureflag,
-      }
-    }
-    'child': {
-      notice 'create AD child'
-    }
-    default: {
-      fail 'Invlaid install type, try \'forest\' or \'child\''
-    }
+  class{'::windows_ad::conf_forest':
+    ensure                    => $configure,
+    domainname                => $domainname,
+    netbiosdomainname         => $netbiosdomainname,
+    domainlevel               => $domainlevel,
+    forestlevel               => $forestlevel,
+    globalcatalog             => $globalcatalog,
+    databasepath              => $databasepath,
+    logpath                   => $logpath,
+    sysvolpath                => $sysvolpath,
+    dsrmpassword              => $dsrmpassword,
+    installdns                => $installdns,
+    kernel_ver                => $kernel_ver,
+    localadminpassword        => $localadminpassword,
+    force                     => $force,
+    forceremoval              => $forceremoval,
+    uninstalldnsrole          => $uninstalldnsrole,
+    demoteoperationmasterrole => $demoteoperationmasterrole,
+    configureflag             => $configureflag,
+    installtype               => $installtype,
+    ent_admin_username        => $ent_admin_username,
+    ent_admin_password        => $ent_admin_password,
+    restart                   => $restart,
+    site_name                 => $site_name,
   }
+
   if($installflag or $configureflag){
     if($install == 'present'){
       anchor{'windows_ad::begin':} -> Class['windows_ad::install'] -> Class['windows_ad::conf_forest'] -> anchor{'windows_ad::end':} -> Windows_ad::Organisationalunit <| |> -> Windows_ad::Group <| |> -> Windows_ad::User <| |> -> Windows_ad::Groupmembers <| |>
