@@ -60,6 +60,7 @@ class windows_ad::conf_forest (
   $ent_admin_username        = $ent_admin_username,
   $ent_admin_password        = $ent_admin_password,
   $restart                   = $restart,
+  $source_dc                 = $source_dc,
 
   #removal parameters
   $localadminpassword        = $localadminpassword, #admin password required for removal
@@ -107,7 +108,7 @@ class windows_ad::conf_forest (
             if ($kernel_ver =~ /^6\.2|^6\.3/) {
                 # Deploy Server 2012 Active Directory
                 exec { 'Config ADDS':
-                  command  => "Import-Module ADDSDeployment; Install-ADDSForest -Force -DomainName ${domainname} -DomainMode ${domainlevel} -DomainNetbiosName ${netbiosdomainname} -ForestMode ${forestlevel} -DatabasePath ${databasepath} -LogPath ${logpath} -SysvolPath ${sysvolpath} -SafeModeAdministratorPassword (convertto-securestring '${dsrmpassword}' -asplaintext -force) -InstallDns",
+                  command  => "Import-Module ADDSDeployment; Install-ADDSForest -Force -DomainName ${domainname} -DomainMode ${domainlevel} -DomainNetbiosName ${} -ForestMode ${forestlevel} -DatabasePath ${databasepath} -LogPath ${logpath} -SysvolPath ${sysvolpath} -SafeModeAdministratorPassword (convertto-securestring '${dsrmpassword}' -asplaintext -force) -InstallDns",
                   provider => powershell,
                   onlyif   => "if((gwmi WIN32_ComputerSystem).Domain -eq \'${domainname}\'){exit 1}",
                   timeout  => $timeout,
@@ -139,10 +140,14 @@ class windows_ad::conf_forest (
                 $domain_elements = split($domainname, '[.]')
                 $child_domain = $domain_elements[0]
                 $parent_domain = join(delete_at($domain_elements,0), '.')
+                $replication_source = $source_dc ? {
+                  undef   => '',
+                  default => '-ReplicationSourceDC ${source_dc}'
+                }
 
                 # Deploy Server 2012 Active Directory
                 exec { 'Config ADDS':
-                  command  => "Install-ADDSDomain -NoGlobalCatalog:\$${noglobalcatalogbool} -CreateDnsDelegation:\$true -Credential (New-Object PSCredential('${ent_admin_username}',(ConvertTo-SecureString '${ent_admin_password}' -AsPlainText -Force))) -DomainMode ${domainlevel} -DomainType \"ChildDomain\" -InstallDns:\$true -NewDomainName ${child_domain} -NewDomainNetbiosName ${netbiosdomainname} -ParentDomainName ${parent_domain} -NoRebootOnCompletion:\$${norestartbool} -SiteName \"${site_name}\" -Force:\$true -SafeModeAdministratorPassword (ConvertTo-SecureString '${dsrmpassword}' -AsPlainText -Force)",
+                  command  => "Install-ADDSDomain -NoGlobalCatalog:\$${noglobalcatalogbool} -CreateDnsDelegation:\$true -Credential (New-Object PSCredential('${ent_admin_username}',(ConvertTo-SecureString '${ent_admin_password}' -AsPlainText -Force))) -DomainMode ${domainlevel} -DomainType \"ChildDomain\" -InstallDns:\$true -NewDomainName ${child_domain}  -NewDomainNetbiosName ${netbiosdomainname} -ParentDomainName ${parent_domain} -NoRebootOnCompletion:\$${norestartbool} -SiteName \"${site_name}\" -Force:\$true ${replication_source} -SafeModeAdministratorPassword (ConvertTo-SecureString '${dsrmpassword}' -AsPlainText -Force)",
                   provider => powershell,
                   onlyif   => "if ((gwmi WIN32_ComputerSystem).Domain -ne '${domainname}') {exit 0} else {exit 1}",
                   timeout  => $timeout,
